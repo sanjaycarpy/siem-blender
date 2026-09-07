@@ -1,8 +1,23 @@
+
 import socket
 import json
 
 HOST = "0.0.0.0"
 PORT = 5001
+
+
+def normalize_alert(alert):
+    rule = alert.get("rule", {})
+    agent = alert.get("agent", {})
+
+    return {
+        "source": "wazuh",
+        "timestamp": alert.get("timestamp"),
+        "severity": rule.get("level"),
+        "rule": rule.get("id"),
+        "description": rule.get("description"),
+        "agent": agent.get("name")
+    }
 
 
 def start_server():
@@ -33,9 +48,11 @@ def start_server():
                 try:
                     alert = json.loads(buffer)
 
-                    print("\n--- Wazuh Alert ---")
-                    print(json.dumps(alert, indent=2))
-                    print("-------------------")
+                    event = normalize_alert(alert)
+
+                    print("\n--- SIEM Event ---")
+                    print(json.dumps(event, indent=2))
+                    print("------------------")
 
                     buffer = ""
 
@@ -45,3 +62,4 @@ def start_server():
 
 if __name__ == "__main__":
     start_server()
+    
