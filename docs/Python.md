@@ -2,7 +2,7 @@
 
 ### Objective
 
-The forwarder is responsible for monitoring the Wazuh Manager alert stream and transmitting new JSON alerts to the Python receiver running on macOS.
+The forwarder is responsible for monitoring the Wazuh Manager alert stream and transmitting new JSON alerts to the Python receiver running on Windows.
 
 ### Location
 
@@ -51,7 +51,7 @@ Normalized SIEM Event
 
 ## Python Receiver
 
-The receiver runs on macOS and listens on TCP port `5001`.
+The receiver runs on Windows and listens on TCP port `5001`.
 
 ```text
 0.0.0.0:5001
@@ -72,7 +72,7 @@ agent
 
 A real Wazuh alert was successfully received:
 
-```text
+```json
 --- SIEM Event ---
 
 {
@@ -81,7 +81,7 @@ A real Wazuh alert was successfully received:
   "severity": 3,
   "rule": "5402",
   "description": "Successful sudo to ROOT executed.",
-  "agent": "Mac-de-Sanjay.lan"
+  "agent": "Windows11"
 }
 ```
 
