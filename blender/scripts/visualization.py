@@ -9,89 +9,124 @@ import queue
 HOST = "127.0.0.1"
 PORT = 5002
 
+ROTATION_AXIS = "Z"
+
+BASE_SPEED = 0.01
+SPEED_PER_ALERT = 0.002
+MAX_ALERTS_FOR_SPEED = 50
+
+
+severity_counts = {
+    1: 0,
+    2: 0,
+    3: 0
+}
+
+
+SPHERE_NAMES = {
+    1: "sp1",
+    2: "sp2",
+    3: "sp3"
+}
+
+
 server = None
 receiver_thread = None
 receiver_running = False
 
 event_queue = queue.Queue()
-received_events = []
 
 
-# ============================================================
-# BLENDER VISUALIZATION
-# ============================================================
+def get_severity_bucket(severity):
 
-def create_alert_cube(event):
-    severity = event.get("severity") or 0
-    rule = event.get("rule") or "UNKNOWN"
+    if severity <= 6:
+        return 1
 
-    try:
-        severity = int(severity)
-    except (TypeError, ValueError):
-        severity = 0
+    elif severity <= 11:
+        return 2
 
-    # Positionner les cubes horizontalement
-    index = len(received_events) - 1
-    x = index * 3
+    else:
+        return 3
 
-    # Créer le cube
-    bpy.ops.mesh.primitive_cube_add(
-        size=2,
-        location=(x, 0, 1)
-    )
 
-    cube = bpy.context.object
+def update_severity_count(severity):
 
-    cube.name = f"SIEM_ALERT_{rule}_{index}"
+    bucket = get_severity_bucket(severity)
 
-    # Hauteur selon la sévérité
-    cube.scale.z = max(1, severity / 5)
-
-    # Informations utiles dans les propriétés Blender
-    cube["source"] = event.get("source")
-    cube["timestamp"] = event.get("timestamp")
-    cube["severity"] = severity
-    cube["rule"] = rule
-    cube["description"] = event.get("description")
-    cube["agent"] = event.get("agent")
+    severity_counts[bucket] += 1
 
     print(
-        f"[BLENDER] Cube créé | "
-        f"rule={rule} | severity={severity}"
+        f"[SIEM] Severity {severity} -> bucket {bucket}"
     )
 
 
-# ============================================================
-# PROCESS EVENTS ON BLENDER MAIN THREAD
-# ============================================================
+def rotate_spheres():
+
+    for bucket, sphere_name in SPHERE_NAMES.items():
+
+        sphere = bpy.data.objects.get(sphere_name)
+
+        if sphere is None:
+            print(
+                f"[!] Blender object not found: {sphere_name}"
+            )
+            continue
+
+        alert_count = min(
+            severity_counts[bucket],
+            MAX_ALERTS_FOR_SPEED
+        )
+
+        if alert_count == 0:
+            continue
+
+        speed = (
+            BASE_SPEED
+            + alert_count * SPEED_PER_ALERT
+        )
+
+        if ROTATION_AXIS == "X":
+            sphere.rotation_euler.x += speed
+
+        elif ROTATION_AXIS == "Y":
+            sphere.rotation_euler.y += speed
+
+        else:
+            sphere.rotation_euler.z += speed
+
 
 def process_events():
+
     while not event_queue.empty():
 
         try:
             event = event_queue.get_nowait()
+
         except queue.Empty:
             break
 
-        received_events.append(event)
+        severity = event.get("severity") or 0
 
-        print("\n--- BLENDER SIEM EVENT ---")
-        print(f"Source:      {event.get('source')}")
-        print(f"Timestamp:   {event.get('timestamp')}")
-        print(f"Severity:    {event.get('severity')}")
-        print(f"Rule:        {event.get('rule')}")
-        print(f"Description: {event.get('description')}")
-        print(f"Agent:       {event.get('agent')}")
-        print("--------------------------")
+        try:
+            severity = int(severity)
 
-        create_alert_cube(event)
+        except (TypeError, ValueError):
+            severity = 0
+
+        update_severity_count(severity)
+
+        print(
+            f"[SIEM] Event received | "
+            f"severity={severity} | "
+            f"sp1={severity_counts[1]} | "
+            f"sp2={severity_counts[2]} | "
+            f"sp3={severity_counts[3]}"
+        )
+
+    rotate_spheres()
 
     return 0.1
 
-
-# ============================================================
-# NETWORK RECEIVER
-# ============================================================
 
 def receive_events():
 
@@ -111,15 +146,18 @@ def receive_events():
             1
         )
 
-        server.bind((HOST, PORT))
+        server.bind(
+            (HOST, PORT)
+        )
+
         server.listen(5)
+
         server.setblocking(False)
 
         receiver_running = True
 
         print(
-            f"[*] Blender SIEM receiver listening "
-            f"on {HOST}:{PORT}"
+            f"[*] SIEM receiver listening on {HOST}:{PORT}"
         )
 
         while receiver_running:
@@ -147,19 +185,19 @@ def receive_events():
                         data.decode("utf-8")
                     )
 
-                    # IMPORTANT :
-                    # Le thread réseau ne touche pas à bpy.
                     event_queue.put(event)
-
-                    print("[+] Event added to Blender queue")
 
                 except json.JSONDecodeError:
 
-                    print("[!] Invalid JSON received")
+                    print(
+                        "[!] Invalid JSON received"
+                    )
 
                 except ConnectionError:
 
-                    print("[!] Connection error")
+                    print(
+                        "[!] Connection error"
+                    )
 
                 finally:
 
@@ -172,7 +210,7 @@ def receive_events():
     except Exception as error:
 
         print(
-            "[!] Blender SIEM receiver error:",
+            "[!] SIEM receiver error:",
             repr(error)
         )
 
@@ -185,12 +223,10 @@ def receive_events():
 
         server = None
 
-        print("[*] Blender SIEM receiver stopped")
+        print(
+            "[*] SIEM receiver stopped"
+        )
 
-
-# ============================================================
-# START / STOP
-# ============================================================
 
 def start_receiver():
 
@@ -198,7 +234,10 @@ def start_receiver():
 
     if receiver_thread and receiver_thread.is_alive():
 
-        print("[!] Blender receiver already running")
+        print(
+            "[!] SIEM receiver already running"
+        )
+
         return
 
     receiver_thread = threading.Thread(
@@ -209,7 +248,6 @@ def start_receiver():
 
     receiver_thread.start()
 
-    # Timer exécuté par le thread principal de Blender
     if not bpy.app.timers.is_registered(process_events):
 
         bpy.app.timers.register(
@@ -217,7 +255,9 @@ def start_receiver():
             first_interval=0.1
         )
 
-    print("[*] Blender SIEM receiver started")
+    print(
+        "[*] SIEM receiver started"
+    )
 
 
 def stop_receiver():
@@ -226,8 +266,11 @@ def stop_receiver():
 
     receiver_running = False
 
-    print("[*] Stopping Blender SIEM receiver...")
+    print(
+        "[*] Stopping SIEM receiver..."
+    )
 
 
-print("SIEM × BLENDER")
-print("Blender event visualization ready")
+print("SIEM x BLENDER")
+print("Severity buckets: 0-6 / 7-11 / +=12")
+print("Receiver ready")

@@ -2,7 +2,7 @@
 
 ### Objective
 
-The forwarder is responsible for monitoring the Wazuh Manager alert stream and transmitting new JSON alerts to the Python receiver running on Windows.
+The forwarder is responsible for monitoring the Wazuh Manager alert stream and transmitting new JSON alerts to the Python receiver running on MacOS.
 
 ### Location
 
@@ -16,42 +16,13 @@ The forwarder is responsible for monitoring the Wazuh Manager alert stream and t
 python3 ~/wazuh-forwarder/forwarder.py
 ```
 
-Expected output:
+#### Example 
 
-```text
-[*] Wazuh forwarder started
-[*] Sending alerts to 192.168.1.211:5001
-[*] Waiting for new alerts...
-```
-
-When a new Wazuh alert is detected:
-
-```text
-[+] Alert sent: rule=5402
-```
-
-### Data Flow
-
-```text
-alerts.json
-     │
-     ▼
-forwarder.py
-     │
-     │ JSON over TCP
-     ▼
-receiver.py
-     │
-     ▼
-normalize_alert()
-     │
-     ▼
-Normalized SIEM Event
-```
+<img src="/Media/screen forwarder script.png" height="450">
 
 ## Python Receiver
 
-The receiver runs on Windows and listens on TCP port `5001`.
+The receiver runs on MacOS and listens on TCP port `5001`.
 
 ```text
 0.0.0.0:5001
@@ -68,22 +39,10 @@ description
 agent
 ```
 
-### Validation
+#### Example 
 
-A real Wazuh alert was successfully received:
+<img src="/Media/screen receiver script.png" height="450">
 
-```json
---- SIEM Event ---
-
-{
-  "source": "wazuh",
-  "timestamp": "2026-09-07T19:10:58.806+0000",
-  "severity": 3,
-  "rule": "5402",
-  "description": "Successful sudo to ROOT executed.",
-  "agent": "Windows11"
-}
-```
 
 ### Result
 
